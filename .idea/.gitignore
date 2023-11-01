@@ -1,0 +1,8 @@
+# Webstorm configs
+.idea
+
+# Default ignored files
+/workspace.xml
+
+# Contains secrets
+client_info.json

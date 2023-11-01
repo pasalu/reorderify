@@ -16,7 +16,6 @@ var fs = require('fs');
 
 // Hiding client info in JSON file because it should be secret.
 let client_info = JSON.parse(fs.readFileSync('client_info.json', 'utf-8'));
-console.log(client_info);
 
 var client_id = client_info['client_id']; // Your client id
 var client_secret = client_info['client_secret']; // Your secret
@@ -108,6 +107,17 @@ app.get('/callback', function(req, res) {
           console.log(body);
         });
 
+        // Add GET https://api.spotify.com/v1/me/playlists here!
+        var playlistOptions = {
+            url: 'https://api.spotify.com/v1/me/playlists',
+            headers: { 'Authorization': 'Bearer ' + access_token },
+            json: true
+        };
+
+        request.get(playlistOptions, function(error, response, body) {
+            console.log(body);
+        });
+
         // we can also pass the token to the browser to make requests from there
         res.redirect('/#' +
           querystring.stringify({
@@ -149,4 +159,5 @@ app.get('/refresh_token', function(req, res) {
 });
 
 console.log('Listening on 8888');
+console.log("Got here 8888");
 app.listen(8888);
