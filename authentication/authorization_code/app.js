@@ -116,6 +116,7 @@ app.get('/callback', function(req, res) {
 
         request.get(playlistOptions, function(error, response, body) {
             console.log(body);
+            console.log(getStarredPlaylistId(body));
         });
 
         // we can also pass the token to the browser to make requests from there
@@ -158,6 +159,20 @@ app.get('/refresh_token', function(req, res) {
   });
 });
 
-console.log('Listening on 8888');
-console.log("Got here 8888");
+/**
+ * Returns the playlist ID of the starred playlist.
+ * @param {String} response 
+ */
+var getStarredPlaylistId = function(response) {
+  for (let i = 0; i < response["items"].length; i++) {
+    const playlist = response["items"][i];
+    
+    if (playlist["name"] === "Starred") {
+      return playlist["id"];
+    }
+  }
+
+  return null;
+};
+
 app.listen(8888);
