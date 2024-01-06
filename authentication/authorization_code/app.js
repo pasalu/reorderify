@@ -50,7 +50,7 @@ app.get('/login', function(req, res) {
   res.cookie(stateKey, state);
 
   // your application requests authorization
-  var scope = 'user-read-private user-read-email';
+  var scope = 'user-read-private user-read-email playlist-modify-public playlist-modify-private';
   res.redirect('https://accounts.spotify.com/authorize?' +
     querystring.stringify({
       response_type: 'code',
@@ -116,8 +116,15 @@ app.get('/callback', function(req, res) {
 
         request.get(playlistOptions, function(error, response, body) {
             console.log(body);
-            console.log(getStarredPlaylistId(body));
+            const starredPlaylistId = getStarredPlaylistId(body);
+            console.log(`Starred Playlist Id: ${starredPlaylistId}`);
         });
+
+        try {
+          createBackupPlaylist(access_token);
+        } catch (error) {
+          console.log(`Error creating backup playlist: ${error}`);
+        }
 
         // we can also pass the token to the browser to make requests from there
         res.redirect('/#' +
@@ -161,11 +168,11 @@ app.get('/refresh_token', function(req, res) {
 
 /**
  * Returns the playlist ID of the starred playlist.
- * @param {String} response 
+ * @param {String} playlists The JSON body of a call to get a user's playlists.
  */
-var getStarredPlaylistId = function(response) {
-  for (let i = 0; i < response["items"].length; i++) {
-    const playlist = response["items"][i];
+var getStarredPlaylistId = function(playlists) {
+  for (let i = 0; i < playlists["items"].length; i++) {
+    const playlist = playlists["items"][i];
     
     if (playlist["name"] === "Starred") {
       return playlist["id"];
@@ -174,5 +181,32 @@ var getStarredPlaylistId = function(response) {
 
   return null;
 };
+
+/**
+ * Create a backup playlist so we don't have to modify the original starred playlist.
+ * @param {String} accessToken Curernt API access token.
+ */
+var createBackupPlaylist = function(access_token) {
+  // Create the backup playlist.
+  const data = {
+    "name": "StarredClone",
+    "description": "A clone of the playlist which shows what it would be like after it was reordered.",
+    "public": false
+  };
+  const options = {
+    url: 'https://api.spotify.com/v1/me/playlists',
+    headers: { 'Authorization': `Bearer ${access_token}` },
+    body: data,
+    json: true,
+  };
+
+  console.log(`Options are: ${options.toString()}`);
+
+  request.post(options, function(error, response, body) {
+    if (body.error) {
+      console.log(`Error Creating backup playlist error message: ${body.error.message}`);
+    }
+  });
+}
 
 app.listen(8888);
