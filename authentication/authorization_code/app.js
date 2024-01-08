@@ -20,6 +20,7 @@ let client_info = JSON.parse(fs.readFileSync('client_info.json', 'utf-8'));
 var client_id = client_info['client_id']; // Your client id
 var client_secret = client_info['client_secret']; // Your secret
 var redirect_uri = 'http://localhost:8888/callback'; // Your redirect uri
+const STARRED_PLAYLIST_NAME = "starred";
 
 /**
  * Generates a random string containing numbers and letters
@@ -174,7 +175,7 @@ var getStarredPlaylistId = function(playlists) {
   for (let i = 0; i < playlists["items"].length; i++) {
     const playlist = playlists["items"][i];
     
-    if (playlist["name"] === "Starred") {
+    if (playlist["name"] === STARRED_PLAYLIST_NAME) {
       return playlist["id"];
     }
   }
@@ -188,9 +189,11 @@ var getStarredPlaylistId = function(playlists) {
  */
 var createBackupPlaylist = function(access_token) {
   // Create the backup playlist.
+  const DESCRIPTION = "A clone of the playlist which shows what it would be like after it was reordered. Created " + new Date().toString();
+
   const data = {
-    "name": "StarredClone",
-    "description": "A clone of the playlist which shows what it would be like after it was reordered.",
+    "name": "StarredReordered",
+    "description": DESCRIPTION,
     "public": false
   };
   const options = {
@@ -205,6 +208,8 @@ var createBackupPlaylist = function(access_token) {
   request.post(options, function(error, response, body) {
     if (body.error) {
       console.log(`Error Creating backup playlist error message: ${body.error.message}`);
+    } else {
+      console.log("Successfully created backup playlist");
     }
   });
 }
