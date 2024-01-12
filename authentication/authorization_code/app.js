@@ -20,7 +20,7 @@ let client_info = JSON.parse(fs.readFileSync('client_info.json', 'utf-8'));
 var client_id = client_info['client_id']; // Your client id
 var client_secret = client_info['client_secret']; // Your secret
 var redirect_uri = 'http://localhost:8888/callback'; // Your redirect uri
-const STARRED_PLAYLIST_NAME = "starred";
+const STARRED_PLAYLIST_NAME = "Starred";
 
 /**
  * Generates a random string containing numbers and letters
@@ -115,17 +115,18 @@ app.get('/callback', function(req, res) {
             json: true
         };
 
-        request.get(playlistOptions, function(error, response, body) {
-            console.log(body);
-            const starredPlaylistId = getStarredPlaylistId(body);
+        request.get(playlistOptions, function (error, response, body) {
+          getStarredPlaylistId(body).then(starredPlaylistId => {
             console.log(`Starred Playlist Id: ${starredPlaylistId}`);
+            return starredPlaylistId;
+          }).then((starredPlaylistId) => {
+            createBackupPlaylist(access_token);
+            return starredPlaylistId;
+          }).then((starredPlaylistId) => {
+            addTracksToPlaylist(access_token, "StarredTestName", starredPlaylistId);
+          }).catch(console.log);
         });
 
-        try {
-          createBackupPlaylist(access_token);
-        } catch (error) {
-          console.log(`Error creating backup playlist: ${error}`);
-        }
 
         // we can also pass the token to the browser to make requests from there
         res.redirect('/#' +
@@ -172,15 +173,17 @@ app.get('/refresh_token', function(req, res) {
  * @param {String} playlists The JSON body of a call to get a user's playlists.
  */
 var getStarredPlaylistId = function(playlists) {
-  for (let i = 0; i < playlists["items"].length; i++) {
-    const playlist = playlists["items"][i];
-    
-    if (playlist["name"] === STARRED_PLAYLIST_NAME) {
-      return playlist["id"];
+  return new Promise((resolve, reject) => {
+    for (let i = 0; i < playlists["items"].length; i++) {
+      const playlist = playlists["items"][i];
+      
+      if (playlist["name"] === STARRED_PLAYLIST_NAME) {
+        resolve(playlist["id"]);
+      }
     }
-  }
 
-  return null;
+    return reject(`No playlist matching name ${STARRED_PLAYLIST_NAME}`);
+  });
 };
 
 /**
@@ -188,7 +191,6 @@ var getStarredPlaylistId = function(playlists) {
  * @param {String} accessToken Curernt API access token.
  */
 var createBackupPlaylist = function(access_token) {
-  // Create the backup playlist.
   const DESCRIPTION = "A clone of the playlist which shows what it would be like after it was reordered. Created " + new Date().toString();
 
   const data = {
@@ -205,13 +207,36 @@ var createBackupPlaylist = function(access_token) {
 
   console.log(`Options are: ${options.toString()}`);
 
-  request.post(options, function(error, response, body) {
-    if (body.error) {
-      console.log(`Error Creating backup playlist error message: ${body.error.message}`);
-    } else {
-      console.log("Successfully created backup playlist");
-    }
+  return new Promise((resolve, reject) => {
+    request.post(options, function(error, response, body) {
+      if (body.error) {
+        reject(`Error Creating backup playlist error message: ${body.error.message}`);
+      } else {
+        console.log("Successfully created backup playlist");
+        resolve(body.name);
+      }
+    });
   });
 }
 
+/**
+ * Using the starred playlist as a base, add tracks to the new playlist with the last track as the first.
+ * @param {String} access_token 
+ */
+var addTracksToPlaylist = function(access_token, newPlaylistName, starredPlaylistId) {
+  // Get tracks from starred playlist.
+  const options = {
+    url: `https://api.spotify.com/v1/playlists/${starredPlaylistId}/tracks`,
+    headers: { 'Authorization': `Bearer ${access_token}` },
+    market: "US", // TODO: Get the country code dynamically https://developer.spotify.com/documentation/web-api/reference/get-current-users-profile
+    limit: 50,
+    offset: 0
+  }
+
+  request.get(options, function(error, response, body) {
+    console.log(error);
+    console.log(response);
+    console.log(body);
+  });
+}
 app.listen(8888);

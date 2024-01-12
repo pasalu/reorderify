@@ -1,5 +1,7 @@
 - Create a separate project stripping out unnecessary addons from sample Spotify project.
 - Figure out a way to publish this.
+    - Make sure to fork and attribute code to spotify example on github.
 - Create separate new playlists that contain both old and reordered playlist. A dry run option.
 - Should the user login using their account or can I just retrieve the playlist 
 - Add the ability to specify which playlist should be reordered.
+- Add a command line level tool to delete a playlist by name.
