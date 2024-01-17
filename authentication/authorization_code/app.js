@@ -123,7 +123,8 @@ app.get('/callback', function(req, res) {
             createBackupPlaylist(access_token);
             return starredPlaylistId;
           }).then((starredPlaylistId) => {
-            addTracksToPlaylist(access_token, "StarredTestName", starredPlaylistId);
+            let tracks = getTracksFromPlaylist(access_token, starredPlaylistId);
+            return tracks;
           }).catch(console.log);
         });
 
@@ -205,8 +206,6 @@ var createBackupPlaylist = function(access_token) {
     json: true,
   };
 
-  console.log(`Options are: ${options.toString()}`);
-
   return new Promise((resolve, reject) => {
     request.post(options, function(error, response, body) {
       if (body.error) {
@@ -223,20 +222,36 @@ var createBackupPlaylist = function(access_token) {
  * Using the starred playlist as a base, add tracks to the new playlist with the last track as the first.
  * @param {String} access_token 
  */
-var addTracksToPlaylist = function(access_token, newPlaylistName, starredPlaylistId) {
+var getTracksFromPlaylist = function(access_token, starredPlaylistId) {
   // Get tracks from starred playlist.
+  const LIMIT = 3;
+  const OFFSET = 0;
+  const FIELDS = "items.track.uri";
   const options = {
-    url: `https://api.spotify.com/v1/playlists/${starredPlaylistId}/tracks`,
+    url: `https://api.spotify.com/v1/playlists/${starredPlaylistId}/tracks?limit=${LIMIT}&offset=${OFFSET}&fields=${FIELDS}`,
     headers: { 'Authorization': `Bearer ${access_token}` },
     market: "US", // TODO: Get the country code dynamically https://developer.spotify.com/documentation/web-api/reference/get-current-users-profile
-    limit: 50,
-    offset: 0
-  }
+  };
 
-  request.get(options, function(error, response, body) {
-    console.log(error);
-    console.log(response);
-    console.log(body);
-  });
+  return new Promise((resolve, reject) => {
+    request.get(options, function(error, response, body) {
+      if (error) {
+        reject(`Error fetching playlist tracks ${error}`);
+      } else {
+        console.log(`Response ${response}`);
+        console.log(`Body: ${body}`);
+        let bodyJson = JSON.parse(body);
+
+        var tracks = [];
+
+        for(let i = 0; i < bodyJson.items.length; i++) {
+          tracks.push(bodyJson["items"][i]["track"]["uri"]);
+        }
+
+        console.log(`Tracks: ${tracks}`);
+        resolve(tracks);
+      }
+    });
+  })
 }
 app.listen(8888);
