@@ -116,18 +116,18 @@ app.get('/callback', function(req, res) {
         };
 
         request.get(playlistOptions, function (error, response, body) {
-          getStarredPlaylistId(body).then(starredPlaylistId => {
-            console.log(`Starred Playlist Id: ${starredPlaylistId}`);
-            return starredPlaylistId;
-          }).then((starredPlaylistId) => {
+          extractPlaylistDetails(body, STARRED_PLAYLIST_NAME).then(playlistDetails => {
+            console.log(`Starred Playlist Details: ${playlistDetails}`);
+            return playlistDetails;
+          }).then((playlistDetails) => {
             createBackupPlaylist(access_token);
-            return starredPlaylistId;
-          }).then((starredPlaylistId) => {
-            let tracks = getTracksFromPlaylist(access_token, starredPlaylistId);
-            return tracks;
+            return playlistDetails;
+          }).then((playlistDetails) => {
+            return getAllTracksFromPlaylist(access_token, playlistDetails);
+          }).then((tracks) => {
+            console.log(`All ${tracks.length} tracks ${tracks}`);
           }).catch(console.log);
         });
-
 
         // we can also pass the token to the browser to make requests from there
         res.redirect('/#' +
@@ -170,16 +170,22 @@ app.get('/refresh_token', function(req, res) {
 });
 
 /**
- * Returns the playlist ID of the starred playlist.
+ * Gets information about the specified playlist.
  * @param {String} playlists The JSON body of a call to get a user's playlists.
+ * @param {String} playlistName The name of the playlist.
+ * @returns {Object} The playlist id and number of tracks.
  */
-var getStarredPlaylistId = function(playlists) {
+var extractPlaylistDetails = function(playlists, playlistName) {
   return new Promise((resolve, reject) => {
     for (let i = 0; i < playlists["items"].length; i++) {
       const playlist = playlists["items"][i];
       
-      if (playlist["name"] === STARRED_PLAYLIST_NAME) {
-        resolve(playlist["id"]);
+      if (playlist["name"] === playlistName) {
+        let playlistDetails = {
+          id: playlist.id,
+          total: playlist.tracks.total
+        }
+        resolve(playlistDetails);
       }
     }
 
@@ -219,16 +225,17 @@ var createBackupPlaylist = function(access_token) {
 }
 
 /**
- * Using the starred playlist as a base, add tracks to the new playlist with the last track as the first.
+ * Get track id's from the specified playlist.
  * @param {String} access_token 
+ * @param {string} playlistId Id of the playlist to search.
+ * @param {Number} offset Position within the playlist to start searching for tracks.
+ * @param {Number} limit Maximum number of tracks to return.
+ * @returns {Array} An array of Spotify track URI's.
  */
-var getTracksFromPlaylist = function(access_token, starredPlaylistId) {
-  // Get tracks from starred playlist.
-  const LIMIT = 3;
-  const OFFSET = 0;
+var getTracksFromPlaylist = function(access_token, playlistId, offset, limit) {
   const FIELDS = "items.track.uri";
   const options = {
-    url: `https://api.spotify.com/v1/playlists/${starredPlaylistId}/tracks?limit=${LIMIT}&offset=${OFFSET}&fields=${FIELDS}`,
+    url: `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=${limit}&offset=${offset}&fields=${FIELDS}`,
     headers: { 'Authorization': `Bearer ${access_token}` },
     market: "US", // TODO: Get the country code dynamically https://developer.spotify.com/documentation/web-api/reference/get-current-users-profile
   };
@@ -238,8 +245,6 @@ var getTracksFromPlaylist = function(access_token, starredPlaylistId) {
       if (error) {
         reject(`Error fetching playlist tracks ${error}`);
       } else {
-        console.log(`Response ${response}`);
-        console.log(`Body: ${body}`);
         let bodyJson = JSON.parse(body);
 
         var tracks = [];
@@ -248,10 +253,32 @@ var getTracksFromPlaylist = function(access_token, starredPlaylistId) {
           tracks.push(bodyJson["items"][i]["track"]["uri"]);
         }
 
-        console.log(`Tracks: ${tracks}`);
         resolve(tracks);
       }
     });
   })
+}
+
+var getAllTracksFromPlaylist = function(access_token, playlistDetails) {
+  const LIMIT = 50;
+  var promises = [];
+
+  for (let i = 0; i < playlistDetails.total; i += 50) {
+    promises.push(getTracksFromPlaylist(access_token, playlistDetails.id, i, LIMIT));
+  }
+
+  return new Promise((resolve, reject) => {
+    Promise.all(promises)
+      .then((tracks) => {
+        // The result of these promises will be a 2D array of tracks, so we need to flatten them.
+        var allTracks = tracks.flat();
+        resolve(allTracks);
+      }).catch(reject);
+  });
+}
+
+var addTracksToPlaylist = function(access_token, tracks, backupPlaylistId) {
+  const options = {
+  }
 }
 app.listen(8888);
