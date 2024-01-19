@@ -120,12 +120,18 @@ app.get('/callback', function(req, res) {
             console.log(`Starred Playlist Details: ${playlistDetails}`);
             return playlistDetails;
           }).then((playlistDetails) => {
-            createBackupPlaylist(access_token);
-            return playlistDetails;
+            return createBackupPlaylist(access_token).then((backupPlaylistId) => {
+              playlistDetails.backupPlaylistId = backupPlaylistId;
+              return playlistDetails;
+            });
           }).then((playlistDetails) => {
-            return getAllTracksFromPlaylist(access_token, playlistDetails);
-          }).then((tracks) => {
-            console.log(`All ${tracks.length} tracks ${tracks}`);
+            return getAllTracksFromPlaylist(access_token, playlistDetails).then((tracks) => {
+              playlistDetails.tracks = tracks;
+              return playlistDetails;
+            });
+          }).then((playlistDetails) => {
+            console.log(`All ${playlistDetails.tracks.length} tracks ${playlistDetails.tracks}`);
+            addTracksToPlaylist(access_token, playlistDetails.tracks, playlistDetails.backupPlaylistId, 0);
           }).catch(console.log);
         });
 
@@ -182,7 +188,7 @@ var extractPlaylistDetails = function(playlists, playlistName) {
       
       if (playlist["name"] === playlistName) {
         let playlistDetails = {
-          id: playlist.id,
+          originalPlaylistId: playlist.id,
           total: playlist.tracks.total
         }
         resolve(playlistDetails);
@@ -195,7 +201,8 @@ var extractPlaylistDetails = function(playlists, playlistName) {
 
 /**
  * Create a backup playlist so we don't have to modify the original starred playlist.
- * @param {String} accessToken Curernt API access token.
+ * @param {String} accessToken Current API access token.
+ * @returns {String} The id of the newly created playlist.
  */
 var createBackupPlaylist = function(access_token) {
   const DESCRIPTION = "A clone of the playlist which shows what it would be like after it was reordered. Created " + new Date().toString();
@@ -217,8 +224,8 @@ var createBackupPlaylist = function(access_token) {
       if (body.error) {
         reject(`Error Creating backup playlist error message: ${body.error.message}`);
       } else {
-        console.log("Successfully created backup playlist");
-        resolve(body.name);
+        console.log(`Successfully created backup playlist with ID ${body.id}`);
+        resolve(body.id);
       }
     });
   });
@@ -259,12 +266,18 @@ var getTracksFromPlaylist = function(access_token, playlistId, offset, limit) {
   })
 }
 
+/**
+ * Get all tracks from specified playlist.
+ * @param {String} access_token 
+ * @param {Object} playlistDetails Information about the playlist from which we are getting all tracks from.
+ * @returns A Promise containing an array with all tracks.
+ */
 var getAllTracksFromPlaylist = function(access_token, playlistDetails) {
   const LIMIT = 50;
   var promises = [];
 
   for (let i = 0; i < playlistDetails.total; i += 50) {
-    promises.push(getTracksFromPlaylist(access_token, playlistDetails.id, i, LIMIT));
+    promises.push(getTracksFromPlaylist(access_token, playlistDetails.originalPlaylistId, i, LIMIT));
   }
 
   return new Promise((resolve, reject) => {
@@ -277,8 +290,31 @@ var getAllTracksFromPlaylist = function(access_token, playlistDetails) {
   });
 }
 
-var addTracksToPlaylist = function(access_token, tracks, backupPlaylistId) {
+/**
+ * Add tracks to the specified playlist.
+ * @param {String} access_token 
+ * @param {String[]} tracks The Spotify URI of the tracks to add.
+ * @param {String} playlistId The id of the playlist that's getting the new tracks.
+ * @param {Number} position Where in the playlist to add the tracks
+ */
+var addTracksToPlaylist = function(access_token, tracks, playlistId, position) {
   const options = {
+    url: `https://api.spotify.com/v1/playlists/${playlistId}/tracks?position=${position}`,
+    headers: { 'Authorization': `Bearer ${access_token}` },
+    json: true,
+    body: {uris: tracks.slice(0, 100)}
   }
+
+  return new Promise((resolve, reject) => {
+    request.post(options, (error, response, body) => {
+      if (error || (response.statusCode != 200 && response.statusCode != 201)) {
+        reject(error || response.statusMessage);
+      } else {
+        console.log(`Snapshot ID: ${body.snapshot_id}`);
+        resolve(body);
+      }
+    });
+  });
 }
+
 app.listen(8888);

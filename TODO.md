@@ -5,3 +5,4 @@
 - Should the user login using their account or can I just retrieve the playlist 
 - Add the ability to specify which playlist should be reordered.
 - Add a command line level tool to delete a playlist by name.
+- Preserve public/private status when compared to original playlist.
