@@ -117,7 +117,6 @@ app.get('/callback', function(req, res) {
 
         request.get(playlistOptions, function (error, response, body) {
           extractPlaylistDetails(body, STARRED_PLAYLIST_NAME).then(playlistDetails => {
-            console.log(`Starred Playlist Details: ${playlistDetails}`);
             return playlistDetails;
           }).then((playlistDetails) => {
             return createBackupPlaylist(access_token).then((backupPlaylistId) => {
@@ -130,8 +129,7 @@ app.get('/callback', function(req, res) {
               return playlistDetails;
             });
           }).then((playlistDetails) => {
-            console.log(`All ${playlistDetails.tracks.length} tracks ${playlistDetails.tracks}`);
-            addTracksToPlaylist(access_token, playlistDetails.tracks, playlistDetails.backupPlaylistId, 0);
+            return addAllTracksToPlaylist(access_token, playlistDetails.tracks, playlistDetails.backupPlaylistId);
           }).catch(console.log);
         });
 
@@ -257,7 +255,15 @@ var getTracksFromPlaylist = function(access_token, playlistId, offset, limit) {
         var tracks = [];
 
         for(let i = 0; i < bodyJson.items.length; i++) {
-          tracks.push(bodyJson["items"][i]["track"]["uri"]);
+          let track = bodyJson["items"][i]["track"]["uri"];
+
+          // Local tracks like "spotify:local:Eminem:Infinite:Scary+Movie:220" cannot be added
+          // with the api, so just exclude them.
+          if (track.startsWith("spotify:track:")) {
+            tracks.push(track);
+          } else {
+            console.log(`Not using track "${track}"`);
+          }
         }
 
         resolve(tracks);
@@ -270,7 +276,7 @@ var getTracksFromPlaylist = function(access_token, playlistId, offset, limit) {
  * Get all tracks from specified playlist.
  * @param {String} access_token 
  * @param {Object} playlistDetails Information about the playlist from which we are getting all tracks from.
- * @returns A Promise containing an array with all tracks.
+ * @returns A Promise containing an array with all non local tracks.
  */
 var getAllTracksFromPlaylist = function(access_token, playlistDetails) {
   const LIMIT = 50;
@@ -291,30 +297,46 @@ var getAllTracksFromPlaylist = function(access_token, playlistDetails) {
 }
 
 /**
- * Add tracks to the specified playlist.
+ * Add a maximum of 100 tracks to the specified playlist.
  * @param {String} access_token 
- * @param {String[]} tracks The Spotify URI of the tracks to add.
+ * @param {String[]} tracks The Spotify URIs of the tracks to add.
  * @param {String} playlistId The id of the playlist that's getting the new tracks.
  * @param {Number} position Where in the playlist to add the tracks
  */
 var addTracksToPlaylist = function(access_token, tracks, playlistId, position) {
   const options = {
-    url: `https://api.spotify.com/v1/playlists/${playlistId}/tracks?position=${position}`,
+    url: `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
     headers: { 'Authorization': `Bearer ${access_token}` },
     json: true,
-    body: {uris: tracks.slice(0, 100)}
+    body: {uris: tracks}
   }
 
   return new Promise((resolve, reject) => {
     request.post(options, (error, response, body) => {
       if (error || (response.statusCode != 200 && response.statusCode != 201)) {
-        reject(error || response.statusMessage);
+        reject(error || response.statusMessage + " " + body.error.message);
       } else {
-        console.log(`Snapshot ID: ${body.snapshot_id}`);
-        resolve(body);
+        resolve();
       }
     });
   });
 }
 
+var addAllTracksToPlaylist = function(access_token, tracks, playlistId) {
+  const NUMBER_OF_SONGS_TO_ADD = 100;
+  let promises = [];
+
+  for (let i = 0; i < tracks.length; i += NUMBER_OF_SONGS_TO_ADD) {
+    promises.push(
+      addTracksToPlaylist(access_token, tracks.slice(i, i + NUMBER_OF_SONGS_TO_ADD), playlistId, 0)
+    );
+  }
+
+  return new Promise((resolve, reject) => {
+    Promise.all(promises)
+      .then((tracks) => {
+        resolve();
+      }).catch(reject);
+  });
+}
 app.listen(8888);
