@@ -21,6 +21,7 @@ var client_id = client_info['client_id']; // Your client id
 var client_secret = client_info['client_secret']; // Your secret
 var redirect_uri = 'http://localhost:8888/callback'; // Your redirect uri
 const STARRED_PLAYLIST_NAME = "Starred";
+const BACKUP_PLAYLIST_SUFFIX = "Reordered";
 
 /**
  * Generates a random string containing numbers and letters
@@ -51,7 +52,7 @@ app.get('/login', function(req, res) {
   res.cookie(stateKey, state);
 
   // your application requests authorization
-  var scope = 'user-read-private user-read-email playlist-modify-public playlist-modify-private';
+  var scope = 'user-read-private user-read-email playlist-read-private playlist-modify-public playlist-modify-private';
   res.redirect('https://accounts.spotify.com/authorize?' +
     querystring.stringify({
       response_type: 'code',
@@ -193,9 +194,28 @@ var extractPlaylistDetails = function(playlists, playlistName) {
       }
     }
 
-    return reject(`No playlist matching name ${STARRED_PLAYLIST_NAME}`);
+    return reject(`No playlist matching name ${playlistName}`);
   });
 };
+
+var clearBackupPlaylist = function(access_token, backupPlaylistId) {
+
+}
+
+/**
+ * Check to see if [name]Reordered exists already and clears the contents if it did already.
+ * 
+ * @param {String} access_token 
+ * @param {JSON} body The body to check to see if the playlist exists already.
+ * @param {String} name The name of the original playlist.
+ */
+var clearBackupPlaylistIfExisting = function(access_token, body, name) {
+  return new Promise((resolve, reject) => {
+    extractPlaylistDetails(body, name+BACKUP_PLAYLIST_SUFFIX)
+      .then((playlistDetails) => clearBackupPlaylist(access_token, playlistDetails.backupPlaylistId))
+      .catch(resolve); // Playlist not existing isn't an error.
+  });
+}
 
 /**
  * Create a backup playlist so we don't have to modify the original starred playlist.
@@ -301,9 +321,8 @@ var getAllTracksFromPlaylist = function(access_token, playlistDetails) {
  * @param {String} access_token 
  * @param {String[]} tracks The Spotify URIs of the tracks to add.
  * @param {String} playlistId The id of the playlist that's getting the new tracks.
- * @param {Number} position Where in the playlist to add the tracks
  */
-var addTracksToPlaylist = function(access_token, tracks, playlistId, position) {
+var addTracksToPlaylist = async function(access_token, tracks, playlistId) {
   const options = {
     url: `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
     headers: { 'Authorization': `Bearer ${access_token}` },
@@ -322,21 +341,31 @@ var addTracksToPlaylist = function(access_token, tracks, playlistId, position) {
   });
 }
 
-var addAllTracksToPlaylist = function(access_token, tracks, playlistId) {
+var addAllTracksToPlaylist = async function(access_token, tracks, playlistId) {
   const NUMBER_OF_SONGS_TO_ADD = 100;
-  let promises = [];
+  const RETRIES = 3;
+  let i = 0;
+  let tries = 0;
 
-  for (let i = 0; i < tracks.length; i += NUMBER_OF_SONGS_TO_ADD) {
-    promises.push(
-      addTracksToPlaylist(access_token, tracks.slice(i, i + NUMBER_OF_SONGS_TO_ADD), playlistId, 0)
-    );
+  while (i < tracks.length) {
+    const result =
+      await addTracksToPlaylist(access_token, tracks.slice(i, i + NUMBER_OF_SONGS_TO_ADD), playlistId, 3).catch(() => {
+        // This return is only for the catch block. The value will be set to result.
+        return false;
+      });
+
+    if (result === false) {
+      tries++;
+
+      if (tries > RETRIES) {
+        return Promise.reject(`Unable to add tracks at index ${i} to playlist.`);
+      } 
+    } else {
+      i += NUMBER_OF_SONGS_TO_ADD;
+      tries = 0;
+    }
   }
 
-  return new Promise((resolve, reject) => {
-    Promise.all(promises)
-      .then((tracks) => {
-        resolve();
-      }).catch(reject);
-  });
+  return Promise.resolve();
 }
 app.listen(8888);
