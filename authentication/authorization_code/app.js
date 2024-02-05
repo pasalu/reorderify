@@ -130,8 +130,15 @@ app.get('/callback', function(req, res) {
               return playlistDetails;
             });
           }).then((playlistDetails) => {
-            return addAllTracksToPlaylist(access_token, playlistDetails.tracks, playlistDetails.backupPlaylistId);
-          }).catch(console.log);
+            return addAllTracksToPlaylist(access_token, playlistDetails.tracks.slice(0, 10), playlistDetails.backupPlaylistId).then(() => {
+              return playlistDetails;
+            });
+          }).then((playlistDetails) => {
+            return reverseTracks(access_token, playlistDetails.backupPlaylistId, playlistDetails.tracks.slice(0, 10)).then(() => {
+              console.log("All tracks reversed?");
+              return playlistDetails;
+            })
+          }).catch(console.error);
         });
 
         // we can also pass the token to the browser to make requests from there
@@ -173,6 +180,7 @@ app.get('/refresh_token', function(req, res) {
     }
   });
 });
+
 
 /**
  * Gets information about the specified playlist.
@@ -239,8 +247,9 @@ var createBackupPlaylist = function(access_token) {
 
   return new Promise((resolve, reject) => {
     request.post(options, function(error, response, body) {
-      if (body.error) {
-        reject(`Error Creating backup playlist error message: ${body.error.message}`);
+      if (error || (response.statusCode != 200 && response.statusCode != 201)) {
+        let message = error || response.statusMessage;
+        reject(`Error Creating backup playlist error message: ${message}`);
       } else {
         console.log(`Successfully created backup playlist with ID ${body.id}`);
         resolve(body.id);
@@ -267,8 +276,9 @@ var getTracksFromPlaylist = function(access_token, playlistId, offset, limit) {
 
   return new Promise((resolve, reject) => {
     request.get(options, function(error, response, body) {
-      if (error) {
-        reject(`Error fetching playlist tracks ${error}`);
+      if (error || (response.statusCode != 200 && response.statusCode != 201)) {
+        let message = error || response.statusMessage;
+        reject(`Error fetching playlist tracks: ${message}`);
       } else {
         let bodyJson = JSON.parse(body);
 
@@ -321,6 +331,7 @@ var getAllTracksFromPlaylist = function(access_token, playlistDetails) {
  * @param {String} access_token 
  * @param {String[]} tracks The Spotify URIs of the tracks to add.
  * @param {String} playlistId The id of the playlist that's getting the new tracks.
+ * @returns A promise with the error message if the operation fails, resolve otherwise.
  */
 var addTracksToPlaylist = async function(access_token, tracks, playlistId) {
   const options = {
@@ -333,7 +344,8 @@ var addTracksToPlaylist = async function(access_token, tracks, playlistId) {
   return new Promise((resolve, reject) => {
     request.post(options, (error, response, body) => {
       if (error || (response.statusCode != 200 && response.statusCode != 201)) {
-        reject(error || response.statusMessage + " " + body.error.message);
+        let message = error || response.statusMessage + " " + body.error.message;
+        reject(`Error adding tracks to playlist ${message}`);
       } else {
         resolve();
       }
@@ -341,6 +353,13 @@ var addTracksToPlaylist = async function(access_token, tracks, playlistId) {
   });
 }
 
+/**
+ * Add all tracks to the playlist.
+ * @param {String} access_token 
+ * @param {String[]} tracks The Spotify URIs of the tracks to add.
+ * @param {String} playlistId The id of the playlist that's getting the new tracks.
+ * @returns A promise with the error message if the operation fails.
+ */
 var addAllTracksToPlaylist = async function(access_token, tracks, playlistId) {
   const NUMBER_OF_SONGS_TO_ADD = 100;
   const RETRIES = 3;
@@ -368,4 +387,38 @@ var addAllTracksToPlaylist = async function(access_token, tracks, playlistId) {
 
   return Promise.resolve();
 }
+
+/**
+ * Reverse the order of the tracks in the playlist.
+ * @param {String} access_token 
+ * @param {String} playlistId The id of the playlist.
+ * @param {String[]} tracks The spotify id's of the tracks.
+ */
+var reverseTracks = function(access_token, playlistId, tracks) {
+  return new Promise((resolve, reject) => {
+    for (let i = 0; i < tracks.length; i++) {
+      const options = {
+        url: `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
+        headers: { 'Authorization': `Bearer ${access_token}` },
+        json: true,
+        body: {
+          uris: [tracks[i]],
+          range_start: i,
+          insert_before: tracks.length,
+          range_length: 1
+        }
+      };
+
+      request.put(options, (error, response, body) => {
+        if (error || (response.statusCode != 200 && response.statusCode != 201)) {
+          let message = error || response.statusMessage + " " + body.error.message;
+          reject(`Error reversing tracks: ${message}`);
+        } else {
+          resolve();
+        }
+      });
+    }
+  });
+}
+
 app.listen(8888);
