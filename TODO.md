@@ -8,6 +8,8 @@
 - Preserve public/private status when compared to original playlist.
 - For the dry run, re-use the existing StarredClone since you cannot delete a playlist with the API.
 - Fetch all playlists, not just the first 20 returned by the API.
+- See if there's a way to use snapshots to make sure that we don't partially modify the real playlist.
+    - We want to make sure this is all or nothing.
 - Solve issue with 502 (Bad Gateway) being returned from API.
     - Might be caused by too many requests at once.
         - Space out requests with random delay in between.

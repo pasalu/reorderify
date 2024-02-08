@@ -389,35 +389,71 @@ var addAllTracksToPlaylist = async function(access_token, tracks, playlistId) {
 }
 
 /**
+ * Move the specified track.
+ * 
+ * @param {String} access_token 
+ * @param {String} playlistId The Spotify Id of the playlist.
+ * @param {String} trackId The Spotify Id of the track.
+ * @param {Number} currentLocation The zero based index of the track in the playlist.
+ * @param {Number} destinationLocation The zero based index the track should be moved to.
+ */
+var moveTrack = function(access_token, playlistId, trackId, currentLocation, destinationLocation) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      url: `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
+      headers: { 'Authorization': `Bearer ${access_token}` },
+      json: true,
+      body: {
+        uris: trackId,
+        range_start: currentLocation,
+        insert_before: destinationLocation,
+        range_length: 1
+      }
+    };
+
+    request.put(options, (error, response, body) => {
+      if (error || (response.statusCode != 200 && response.statusCode != 201)) {
+        let message = error || response.statusMessage + " " + body.error.message;
+        reject(`Error moving track to the bottom: ${message}`);
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
+/**
  * Reverse the order of the tracks in the playlist.
  * @param {String} access_token 
  * @param {String} playlistId The id of the playlist.
  * @param {String[]} tracks The spotify id's of the tracks.
  */
 var reverseTracks = function(access_token, playlistId, tracks) {
-  return new Promise((resolve, reject) => {
-    for (let i = 0; i < tracks.length; i++) {
-      const options = {
-        url: `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
-        headers: { 'Authorization': `Bearer ${access_token}` },
-        json: true,
-        body: {
-          uris: [tracks[i]],
-          range_start: i,
-          insert_before: tracks.length,
-          range_length: 1
-        }
-      };
+  return new Promise(async (resolve, reject) => {
+    const RETRIES = 3;
+    let tries = 0;
+    let i = 0;
 
-      request.put(options, (error, response, body) => {
-        if (error || (response.statusCode != 200 && response.statusCode != 201)) {
-          let message = error || response.statusMessage + " " + body.error.message;
-          reject(`Error reversing tracks: ${message}`);
-        } else {
-          resolve();
-        }
+    console.log(`Reversing ${tracks.length} tracks`);
+
+    while (i < tracks.length) {
+      var result = await moveTrack(access_token, playlistId, tracks[i], 0, tracks.length - i).catch((message) => {
+        return message;
       });
+
+      if (result) {
+        tries++;
+
+        if (tries > RETRIES) {
+          reject(result);
+        }
+      } else {
+        i++;
+        tries = 0;
+      }
     }
+
+    resolve();
   });
 }
 
