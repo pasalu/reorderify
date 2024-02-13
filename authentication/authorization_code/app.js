@@ -109,37 +109,30 @@ app.get('/callback', function(req, res) {
           console.log(body);
         });
 
-        // Add GET https://api.spotify.com/v1/me/playlists here!
-        var playlistOptions = {
-            url: 'https://api.spotify.com/v1/me/playlists',
-            headers: { 'Authorization': 'Bearer ' + access_token },
-            json: true
-        };
-
-        request.get(playlistOptions, function (error, response, body) {
-          extractPlaylistDetails(body, STARRED_PLAYLIST_NAME).then(playlistDetails => {
+        getPlaylists(access_token).then((playlists) => {
+          return extractPlaylistDetails(playlists, STARRED_PLAYLIST_NAME).then(playlistDetails => {
             return playlistDetails;
-          }).then((playlistDetails) => {
-            return createBackupPlaylist(access_token).then((backupPlaylistId) => {
-              playlistDetails.backupPlaylistId = backupPlaylistId;
-              return playlistDetails;
-            });
-          }).then((playlistDetails) => {
-            return getAllTracksFromPlaylist(access_token, playlistDetails).then((tracks) => {
-              playlistDetails.tracks = tracks;
-              return playlistDetails;
-            });
-          }).then((playlistDetails) => {
-            return addAllTracksToPlaylist(access_token, playlistDetails.tracks.slice(0, 10), playlistDetails.backupPlaylistId).then(() => {
-              return playlistDetails;
-            });
-          }).then((playlistDetails) => {
-            return reverseTracks(access_token, playlistDetails.backupPlaylistId, playlistDetails.tracks.slice(0, 10)).then(() => {
-              console.log("All tracks reversed?");
-              return playlistDetails;
-            })
-          }).catch(console.error);
-        });
+          });
+        }).then((playlistDetails) => {
+          return createBackupPlaylist(access_token).then((backupPlaylistId) => {
+            playlistDetails.backupPlaylistId = backupPlaylistId;
+            return playlistDetails;
+          });
+        }).then((playlistDetails) => {
+          return getAllTracksFromPlaylist(access_token, playlistDetails).then((tracks) => {
+            playlistDetails.tracks = tracks;
+            return playlistDetails;
+          });
+        }).then((playlistDetails) => {
+          return addAllTracksToPlaylist(access_token, playlistDetails.tracks, playlistDetails.backupPlaylistId).then(() => {
+            return playlistDetails;
+          });
+        }).then((playlistDetails) => {
+          return reverseTracks(access_token, playlistDetails.backupPlaylistId, playlistDetails.tracks).then(() => {
+            console.log("All tracks reversed?");
+            return playlistDetails;
+          })
+        }).catch(console.error);
 
         // we can also pass the token to the browser to make requests from there
         res.redirect('/#' +
@@ -181,6 +174,25 @@ app.get('/refresh_token', function(req, res) {
   });
 });
 
+var getPlaylists = function(access_token) {
+  return new Promise((resolve, reject) => {
+    // Add GET https://api.spotify.com/v1/me/playlists here!
+    var playlistOptions = {
+        url: 'https://api.spotify.com/v1/me/playlists',
+        headers: { 'Authorization': 'Bearer ' + access_token },
+        json: true
+    };
+
+    request.get(playlistOptions, function (error, response, body) {
+      if (error || (response.statusCode != 200 && response.statusCode != 201)) {
+        let message = error || response.statusMessage;
+        reject(`Error getting playlists ${message}`);
+      } else {
+        resolve(body);
+      }
+    });
+  });
+}
 
 /**
  * Gets information about the specified playlist.
@@ -376,7 +388,7 @@ var addAllTracksToPlaylist = async function(access_token, tracks, playlistId) {
     if (result === false) {
       tries++;
 
-      if (tries > RETRIES) {
+      if (tries >= RETRIES) {
         return Promise.reject(`Unable to add tracks at index ${i} to playlist.`);
       } 
     } else {
@@ -396,8 +408,9 @@ var addAllTracksToPlaylist = async function(access_token, tracks, playlistId) {
  * @param {String} trackId The Spotify Id of the track.
  * @param {Number} currentLocation The zero based index of the track in the playlist.
  * @param {Number} destinationLocation The zero based index the track should be moved to.
+ * @param {String} snapshotId The snapshot version of the playlist against which to make these changes.
  */
-var moveTrack = function(access_token, playlistId, trackId, currentLocation, destinationLocation) {
+var moveTrack = function(access_token, playlistId, trackId, currentLocation, destinationLocation, snapshotId) {
   return new Promise((resolve, reject) => {
     const options = {
       url: `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
@@ -407,16 +420,26 @@ var moveTrack = function(access_token, playlistId, trackId, currentLocation, des
         uris: trackId,
         range_start: currentLocation,
         insert_before: destinationLocation,
-        range_length: 1
+        range_length: 1,
       }
     };
 
+    if (snapshotId != "") {
+      options.body.snapshotId = snapshotId;
+    }
+
     request.put(options, (error, response, body) => {
       if (error || (response.statusCode != 200 && response.statusCode != 201)) {
-        let message = error || response.statusMessage + " " + body.error.message;
-        reject(`Error moving track to the bottom: ${message}`);
+        let message = error || response.statusMessage + " " + body?.error?.message;
+        reject({
+          completed: false,
+          message: `Error moving track to the bottom: ${message}`
+        });
       } else {
-        resolve();
+        resolve({
+          completed: true,
+          message: body.snapshot_id
+        });
       }
     });
   });
@@ -433,27 +456,38 @@ var reverseTracks = function(access_token, playlistId, tracks) {
     const RETRIES = 3;
     let tries = 0;
     let i = 0;
+    let snapshotId = "";
 
     console.log(`Reversing ${tracks.length} tracks`);
 
+    /**
+     * Reverse tracks by inserting top track to the bottom and then shifting bottom up by 1 each time.
+     * 1    2    3    4    5
+     * 2    3    4    5    4
+     * 3 -> 4 -> 5 -> 3 -> 3
+     * 4    5    2    2    2
+     * 5    1    1    1    1
+     */
     while (i < tracks.length) {
-      var result = await moveTrack(access_token, playlistId, tracks[i], 0, tracks.length - i).catch((message) => {
+      console.log(`Moving ${tracks[i]} to ${tracks.length - i}`);
+      var result = await moveTrack(access_token, playlistId, tracks[i], 0, tracks.length - i, snapshotId).catch((message) => {
         return message;
       });
 
-      if (result) {
+      if (!result.completed) {
         tries++;
 
-        if (tries > RETRIES) {
-          reject(result);
+        if (tries >= RETRIES) {
+          return reject(result.message);
         }
       } else {
         i++;
         tries = 0;
+        snapshotId = result.message;
       }
     }
 
-    resolve();
+    return resolve();
   });
 }
 
