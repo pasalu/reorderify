@@ -109,7 +109,7 @@ app.get('/callback', function(req, res) {
           console.log(body);
         });
 
-        getPlaylists(access_token).then((playlists) => {
+        getAllPlaylists(access_token).then((playlists) => {
           return extractPlaylistDetails(playlists, STARRED_PLAYLIST_NAME).then(playlistDetails => {
             return playlistDetails;
           });
@@ -174,11 +174,16 @@ app.get('/refresh_token', function(req, res) {
   });
 });
 
-var getPlaylists = function(access_token) {
+/**
+ * Fetch a paged list of playlists.
+ * @param {String} access_token 
+ * @param {String} url The URL to fetch playlists from.
+ * @returns Playlist data.
+ */
+var getPlaylists = function(access_token, url) {
   return new Promise((resolve, reject) => {
-    // Add GET https://api.spotify.com/v1/me/playlists here!
-    var playlistOptions = {
-        url: 'https://api.spotify.com/v1/me/playlists',
+    let playlistOptions = {
+        url: url,
         headers: { 'Authorization': 'Bearer ' + access_token },
         json: true
     };
@@ -186,11 +191,39 @@ var getPlaylists = function(access_token) {
     request.get(playlistOptions, function (error, response, body) {
       if (error || (response.statusCode != 200 && response.statusCode != 201)) {
         let message = error || response.statusMessage;
-        reject(`Error getting playlists ${message}`);
+        reject({
+          completed: false,
+          message: `Error getting playlists ${message}`
+        });
       } else {
-        resolve(body);
+        resolve({
+          completed: true,
+          message: body
+        });
       }
     });
+  });
+}
+
+var getAllPlaylists = function(access_token) {
+  return new Promise(async (resolve, reject) => {
+    let url = 'https://api.spotify.com/v1/me/playlists?offset=0&limit=50';
+    let items = [];
+
+    while (url) {
+      var result = await getPlaylists(access_token, url).catch((message) => {
+        return message;
+      });
+
+      if (result.completed) {
+        url = result.message.next; // next URL will be null if we've reached the last set of playlists.
+        items.push(...result.message.items);
+      } else {
+        return reject(result.message);
+      }
+    }
+
+    return resolve(items);
   });
 }
 
@@ -198,17 +231,18 @@ var getPlaylists = function(access_token) {
  * Gets information about the specified playlist.
  * @param {String} playlists The JSON body of a call to get a user's playlists.
  * @param {String} playlistName The name of the playlist.
- * @returns {Object} The playlist id and number of tracks.
+ * @returns {Object} The playlist id, number of tracks, and snapshot id.
  */
 var extractPlaylistDetails = function(playlists, playlistName) {
   return new Promise((resolve, reject) => {
-    for (let i = 0; i < playlists["items"].length; i++) {
-      const playlist = playlists["items"][i];
+    for (let i = 0; i < playlists.length; i++) {
+      const playlist = playlists[i];
       
       if (playlist["name"] === playlistName) {
         let playlistDetails = {
           originalPlaylistId: playlist.id,
-          total: playlist.tracks.total
+          total: playlist.tracks.total,
+          snapshotId: playlist.snapshot_id
         }
         resolve(playlistDetails);
       }
@@ -240,15 +274,16 @@ var clearBackupPlaylistIfExisting = function(access_token, body, name) {
 /**
  * Create a backup playlist so we don't have to modify the original starred playlist.
  * @param {String} accessToken Current API access token.
- * @returns {String} The id of the newly created playlist.
+  * @returns {String} The id of the newly created playlist.
  */
 var createBackupPlaylist = function(access_token) {
-  const DESCRIPTION = "A clone of the playlist which shows what it would be like after it was reordered. Created " + new Date().toString();
+  const DESCRIPTION = "A copy of the playlist which shows what it would be like after it was reordered. Created " + new Date().toString();
 
   const data = {
-    "name": "StarredReordered",
-    "description": DESCRIPTION,
-    "public": false
+    name: "Starred" + BACKUP_PLAYLIST_SUFFIX,
+    description: DESCRIPTION,
+    public: false, // Not working for some reason. It's always public.
+    collaborative: false
   };
   const options = {
     url: 'https://api.spotify.com/v1/me/playlists',

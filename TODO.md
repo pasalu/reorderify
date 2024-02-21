@@ -1,6 +1,8 @@
 # TODO
 - See if there's a way to use snapshots to make sure that we don't partially modify the real playlist.
+    - Save the snapshot id when we start modifying the playlists and then keep it until we mark it as done.
     - We want to make sure this is all or nothing.
+    - Might have to wait and retry on API rate limit failure.
 - Create a separate project stripping out unnecessary addons from sample Spotify project.
 - Ask for a rate limit increase from Spotify.
 - Figure out a way to publish this.
