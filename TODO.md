@@ -8,9 +8,10 @@
 - Figure out a way to publish this.
     - Make sure to fork and attribute code to spotify example on github.
 - Add the ability to specify which playlist should be reordered.
-- Preserve public/private status when compared to original playlist.
+- Make backup playlist private.
+    - Not working for some reason.
 - For the dry run, re-use the existing StarredClone since you cannot delete a playlist with the API.
-- Fetch all playlists, not just the first 20 returned by the API.
+- Why are we using a server? Couldn't we make all these requests on the client?
 
 # DONE
 - Should the user login using their account or can I just retrieve the playlist 
@@ -24,3 +25,4 @@
         - Requests to add songs to playlists must go in one order.
             - If we don't we'd have to keep track of where each song should go.
     - Try sending each song request individually to see if we get different failures.
+- Fetch all playlists, not just the first 20 returned by the API.

@@ -174,6 +174,12 @@ app.get('/refresh_token', function(req, res) {
   });
 });
 
+app.get('/get_playlists', function(request, result) {
+  getAllPlaylists(request.query.access_token).then((playlists) => {
+    result.send({playlists: playlists});
+  });
+});
+
 /**
  * Fetch a paged list of playlists.
  * @param {String} access_token 
