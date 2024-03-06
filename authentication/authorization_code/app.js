@@ -20,6 +20,7 @@ let client_info = JSON.parse(fs.readFileSync('client_info.json', 'utf-8'));
 var client_id = client_info['client_id']; // Your client id
 var client_secret = client_info['client_secret']; // Your secret
 var redirect_uri = 'http://localhost:8888/callback'; // Your redirect uri
+let global_access_token = '';
 const STARRED_PLAYLIST_NAME = "Starred";
 const BACKUP_PLAYLIST_SUFFIX = "Reordered";
 
@@ -98,6 +99,8 @@ app.get('/callback', function(req, res) {
         var access_token = body.access_token,
             refresh_token = body.refresh_token;
 
+        global_access_token = access_token;
+
         var options = {
           url: 'https://api.spotify.com/v1/me',
           headers: { 'Authorization': 'Bearer ' + access_token },
@@ -113,25 +116,25 @@ app.get('/callback', function(req, res) {
           return extractPlaylistDetails(playlists, STARRED_PLAYLIST_NAME).then(playlistDetails => {
             return playlistDetails;
           });
-        }).then((playlistDetails) => {
-          return createBackupPlaylist(access_token).then((backupPlaylistId) => {
-            playlistDetails.backupPlaylistId = backupPlaylistId;
-            return playlistDetails;
-          });
-        }).then((playlistDetails) => {
-          return getAllTracksFromPlaylist(access_token, playlistDetails).then((tracks) => {
-            playlistDetails.tracks = tracks;
-            return playlistDetails;
-          });
-        }).then((playlistDetails) => {
-          return addAllTracksToPlaylist(access_token, playlistDetails.tracks, playlistDetails.backupPlaylistId).then(() => {
-            return playlistDetails;
-          });
-        }).then((playlistDetails) => {
-          return reverseTracks(access_token, playlistDetails.backupPlaylistId, playlistDetails.tracks).then(() => {
-            console.log("All tracks reversed?");
-            return playlistDetails;
-          })
+        // }).then((playlistDetails) => {
+        //   return createBackupPlaylist(access_token).then((backupPlaylistId) => {
+        //     playlistDetails.backupPlaylistId = backupPlaylistId;
+        //     return playlistDetails;
+        //   });
+        // }).then((playlistDetails) => {
+        //   return getAllTracksFromPlaylist(access_token, playlistDetails).then((tracks) => {
+        //     playlistDetails.tracks = tracks;
+        //     return playlistDetails;
+        //   });
+        // }).then((playlistDetails) => {
+        //   return addAllTracksToPlaylist(access_token, playlistDetails.tracks, playlistDetails.backupPlaylistId).then(() => {
+        //     return playlistDetails;
+        //   });
+        // }).then((playlistDetails) => {
+        //   return reverseTracks(access_token, playlistDetails.backupPlaylistId, playlistDetails.tracks).then(() => {
+        //     console.log("All tracks reversed?");
+        //     return playlistDetails;
+        //   })
         }).catch(console.error);
 
         // we can also pass the token to the browser to make requests from there
@@ -178,6 +181,36 @@ app.get('/get_playlists', function(request, result) {
   getAllPlaylists(request.query.access_token).then((playlists) => {
     result.send({playlists: playlists});
   });
+});
+
+app.get('/reorder/:playlist_name-:id-:total-:snapshot_id', function(request, result) {
+  let access_token = global_access_token;
+
+  let playlistDetails = {
+    originalPlaylistId: request.params.id,
+    total: request.params.total,
+    snapshotId: request.params.snapshot_id
+  };
+
+  createBackupPlaylist(access_token).then((backupPlaylistId) => {
+      playlistDetails.backupPlaylistId = backupPlaylistId;
+      return playlistDetails;
+  }).then((playlistDetails) => {
+    return getAllTracksFromPlaylist(access_token, playlistDetails).then((tracks) => {
+      playlistDetails.tracks = tracks;
+      return playlistDetails;
+    });
+  }).then((playlistDetails) => {
+    return addAllTracksToPlaylist(access_token, playlistDetails.tracks.slice(0, 10), playlistDetails.backupPlaylistId).then(() => {
+      return playlistDetails;
+    });
+  }).then((playlistDetails) => {
+    return reverseTracks(access_token, playlistDetails.backupPlaylistId, playlistDetails.tracks.slice(0, 10)).then(() => {
+      console.log("All tracks reversed?");
+      result.send(`All tracks in ${request.params.playlist_name} reversed?`);
+      return playlistDetails;
+    })
+  }).catch(console.error);
 });
 
 /**
@@ -258,29 +291,10 @@ var extractPlaylistDetails = function(playlists, playlistName) {
   });
 };
 
-var clearBackupPlaylist = function(access_token, backupPlaylistId) {
-
-}
-
-/**
- * Check to see if [name]Reordered exists already and clears the contents if it did already.
- * 
- * @param {String} access_token 
- * @param {JSON} body The body to check to see if the playlist exists already.
- * @param {String} name The name of the original playlist.
- */
-var clearBackupPlaylistIfExisting = function(access_token, body, name) {
-  return new Promise((resolve, reject) => {
-    extractPlaylistDetails(body, name+BACKUP_PLAYLIST_SUFFIX)
-      .then((playlistDetails) => clearBackupPlaylist(access_token, playlistDetails.backupPlaylistId))
-      .catch(resolve); // Playlist not existing isn't an error.
-  });
-}
-
 /**
  * Create a backup playlist so we don't have to modify the original starred playlist.
  * @param {String} accessToken Current API access token.
-  * @returns {String} The id of the newly created playlist.
+ * @returns {String} The id of the newly created playlist.
  */
 var createBackupPlaylist = function(access_token) {
   const DESCRIPTION = "A copy of the playlist which shows what it would be like after it was reordered. Created " + new Date().toString();

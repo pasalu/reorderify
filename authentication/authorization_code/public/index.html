@@ -54,9 +54,10 @@
     </script>
 
     <script id="user-playlists-template" type="text/x-handlebars-template">
+      <h1>Pick a playlist to reorder</h1>
       <ul>
         {{#each playlists}}
-          <li>{{ this.name }}</li>
+          <li><a href="/reorder/{{this.name}}-{{this.id}}-{{this.tracks.total}}-{{this.snapshot_id}}">{{this.name}}</a></li>
         {{/each}}
       </ul>
     </script>
