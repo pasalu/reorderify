@@ -185,14 +185,14 @@ app.get('/get_playlists', function(request, result) {
 
 app.get('/reorder/:playlist_name-:id-:total-:snapshot_id', function(request, result) {
   let access_token = global_access_token;
-
+  let name = request.params.playlist_name;
   let playlistDetails = {
     originalPlaylistId: request.params.id,
     total: request.params.total,
     snapshotId: request.params.snapshot_id
   };
 
-  createBackupPlaylist(access_token).then((backupPlaylistId) => {
+  createBackupPlaylist(access_token, name).then((backupPlaylistId) => {
       playlistDetails.backupPlaylistId = backupPlaylistId;
       return playlistDetails;
   }).then((playlistDetails) => {
@@ -207,10 +207,13 @@ app.get('/reorder/:playlist_name-:id-:total-:snapshot_id', function(request, res
   }).then((playlistDetails) => {
     return reverseTracks(access_token, playlistDetails.backupPlaylistId, playlistDetails.tracks.slice(0, 10)).then(() => {
       console.log("All tracks reversed?");
-      result.send(`All tracks in ${request.params.playlist_name} reversed?`);
+      result.send(`All tracks in ${name} reversed?`);
       return playlistDetails;
     })
-  }).catch(console.error);
+  }).catch((error) => {
+    console.error(error);
+    result.status(500).send(error);
+  });
 });
 
 /**
@@ -244,6 +247,11 @@ var getPlaylists = function(access_token, url) {
   });
 }
 
+/**
+ * Get all available playlists.
+ * @param {String} access_token 
+ * @returns An array of playlist objects sorted by name.
+ */
 var getAllPlaylists = function(access_token) {
   return new Promise(async (resolve, reject) => {
     let url = 'https://api.spotify.com/v1/me/playlists?offset=0&limit=50';
@@ -261,6 +269,8 @@ var getAllPlaylists = function(access_token) {
         return reject(result.message);
       }
     }
+
+    items.sort((a, b) => a.name.localeCompare(b.name));
 
     return resolve(items);
   });
@@ -292,15 +302,16 @@ var extractPlaylistDetails = function(playlists, playlistName) {
 };
 
 /**
- * Create a backup playlist so we don't have to modify the original starred playlist.
+ * Create a backup playlist so we don't have to modify the original playlist.
  * @param {String} accessToken Current API access token.
+ * @param {String} name The name of the original playlist. Will be prefixed to the backup playlist name.
  * @returns {String} The id of the newly created playlist.
  */
-var createBackupPlaylist = function(access_token) {
+var createBackupPlaylist = function(access_token, name) {
   const DESCRIPTION = "A copy of the playlist which shows what it would be like after it was reordered. Created " + new Date().toString();
 
   const data = {
-    name: "Starred" + BACKUP_PLAYLIST_SUFFIX,
+    name: name + BACKUP_PLAYLIST_SUFFIX,
     description: DESCRIPTION,
     public: false, // Not working for some reason. It's always public.
     collaborative: false
