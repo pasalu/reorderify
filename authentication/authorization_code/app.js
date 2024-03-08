@@ -95,7 +95,6 @@ app.get('/callback', function(req, res) {
 
     request.post(authOptions, function(error, response, body) {
       if (!error && response.statusCode === 200) {
-
         var access_token = body.access_token,
             refresh_token = body.refresh_token;
 
@@ -111,31 +110,6 @@ app.get('/callback', function(req, res) {
         request.get(options, function(error, response, body) {
           console.log(body);
         });
-
-        getAllPlaylists(access_token).then((playlists) => {
-          return extractPlaylistDetails(playlists, STARRED_PLAYLIST_NAME).then(playlistDetails => {
-            return playlistDetails;
-          });
-        // }).then((playlistDetails) => {
-        //   return createBackupPlaylist(access_token).then((backupPlaylistId) => {
-        //     playlistDetails.backupPlaylistId = backupPlaylistId;
-        //     return playlistDetails;
-        //   });
-        // }).then((playlistDetails) => {
-        //   return getAllTracksFromPlaylist(access_token, playlistDetails).then((tracks) => {
-        //     playlistDetails.tracks = tracks;
-        //     return playlistDetails;
-        //   });
-        // }).then((playlistDetails) => {
-        //   return addAllTracksToPlaylist(access_token, playlistDetails.tracks, playlistDetails.backupPlaylistId).then(() => {
-        //     return playlistDetails;
-        //   });
-        // }).then((playlistDetails) => {
-        //   return reverseTracks(access_token, playlistDetails.backupPlaylistId, playlistDetails.tracks).then(() => {
-        //     console.log("All tracks reversed?");
-        //     return playlistDetails;
-        //   })
-        }).catch(console.error);
 
         // we can also pass the token to the browser to make requests from there
         res.redirect('/#' +
