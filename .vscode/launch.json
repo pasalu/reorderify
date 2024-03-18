@@ -11,8 +11,8 @@
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}\\authentication\\authorization_code\\app.js",
-            "cwd": "${workspaceFolder}\\authentication\\authorization_code"
+            "program": "${workspaceFolder}\\authorization\\authorization_code\\app.js",
+            "cwd": "${workspaceFolder}\\authorization\\authorization_code"
         }
     ]
 }
