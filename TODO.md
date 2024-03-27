@@ -1,16 +1,19 @@
 # TODO
-- See if there's a way to use snapshots to make sure that we don't partially modify the real playlist.
+- See if there's a way to use snapshots to make sure that we don't partially modify the real playlist. (3)
     - Save the snapshot id when we start modifying the playlists and then keep it until we mark it as done.
     - We want to make sure this is all or nothing.
     - Might have to wait and retry on API rate limit failure.
 - Create a separate project stripping out unnecessary addons from sample Spotify project.
-- Ask for a rate limit increase from Spotify.
-- Figure out a way to publish this.
-    - Make sure to fork and attribute code to spotify example on github.
+- Ask for a rate limit increase from Spotify. (1)
+- Figure out a way to publish this so other can use it. (3)
+    - Github pages?
+- Fork and attribute code to spotify example on github.
 - Make backup playlist private.
     - Not working for some reason.
 - For the dry run, re-use the existing StarredClone since you cannot delete a playlist with the API.
 - Why are we using a server? Couldn't we make all these requests on the client?
+- Show existing album art along with title before reordering.
+- Allow user to click a checkbox to say if they want to make the changes in a backup playlist. (1)
 
 # DONE
 - Should the user login using their account or can I just retrieve the playlist 

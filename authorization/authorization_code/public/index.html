@@ -39,11 +39,15 @@
 
     <script id="user-playlists-template" type="text/x-handlebars-template">
       <h2>Pick a playlist to reorder</h2>
-      <ul>
+      <form>
         {{#each playlists}}
-          <li><a href="/reorder/{{this.name}}-{{this.id}}-{{this.tracks.total}}-{{this.snapshot_id}}">{{this.name}}</a></li>
+          <input type="radio" name="playlists" value="{{this.name}}" data-name="{{this.name}}" data-id="{{this.id}}" data-total-tracks="{{this.tracks.total}}" data-snapshot-id="{{this.snapshot_id}}">
+          <label for="{{this.name}}">{{this.name}}</label><br>
         {{/each}}
-      </ul>
+
+        <!-- type="button" prevents form submission -->
+        <button id="reorder-button" class="btn btn-primary" type="button">Reorder Selected Playlist</button>
+      </form>
     </script>
 
     <script id="oauth-template" type="text/x-handlebars-template">
@@ -124,7 +128,29 @@
               },
               success: function(response) {
                 playlistsPlaceholder.innerHTML = playlistsTemplate(response);
-              }
+                document.getElementById('reorder-button').addEventListener('click', function() {
+                  const selectedPlaylist = document.querySelector('input[name="playlists"]:checked');
+
+                  if (selectedPlaylist) {
+                    console.log(selectedPlaylist.dataset);
+                    $.ajax({
+                      url: '/reorder',
+                      headers: {
+                        'Authorization': 'Bearer ' + access_token
+                      },
+                      data: {
+                        playlist: selectedPlaylist.dataset
+                      },
+                      success: function(response) {
+                        alert(`${selectedPlaylist.dataset.name} was reordered!`);
+                      },
+                      error: function(jqXHR, textStatus, errorThrown) {
+                        alert(textStatus);
+                      }
+                    });
+                  }
+                });
+                }
             });
           } else {
               // render initial screen

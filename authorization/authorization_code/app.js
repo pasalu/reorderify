@@ -157,13 +157,13 @@ app.get('/get_playlists', function(request, result) {
   });
 });
 
-app.get('/reorder/:playlist_name-:id-:total-:snapshot_id', function(request, result) {
+app.get('/reorder', function(request, result) {
   let access_token = global_access_token;
-  let name = request.params.playlist_name;
+  let name = request.query.playlist.name;
   let playlistDetails = {
-    originalPlaylistId: request.params.id,
-    total: request.params.total,
-    snapshotId: request.params.snapshot_id
+    originalPlaylistId: request.query.playlist.id,
+    total: request.query.playlist.totalTracks,
+    snapshotId: request.query.playlist.snapshot_id
   };
 
   createBackupPlaylist(access_token, name).then((backupPlaylistId) => {
