@@ -45,7 +45,9 @@
           <label for="{{this.name}}">{{this.name}}</label><br>
         {{/each}}
 
-        <!-- type="button" prevents form submission -->
+        <input type="checkbox" id="dry-run" checked>
+        <label for="dry-run">Create a backup playlist and reorder that (dry run)</label><br>
+        <!-- type="button" prevents automatic form submission -->
         <button id="reorder-button" class="btn btn-primary" type="button">Reorder Selected Playlist</button>
       </form>
     </script>
@@ -130,6 +132,7 @@
                 playlistsPlaceholder.innerHTML = playlistsTemplate(response);
                 document.getElementById('reorder-button').addEventListener('click', function() {
                   const selectedPlaylist = document.querySelector('input[name="playlists"]:checked');
+                  const isDryRun = document.getElementById('dry-run').checked;
 
                   if (selectedPlaylist) {
                     console.log(selectedPlaylist.dataset);
@@ -139,13 +142,14 @@
                         'Authorization': 'Bearer ' + access_token
                       },
                       data: {
-                        playlist: selectedPlaylist.dataset
+                        playlist: selectedPlaylist.dataset,
+                        isDryRun: isDryRun
                       },
                       success: function(response) {
                         alert(`${selectedPlaylist.dataset.name} was reordered!`);
                       },
                       error: function(jqXHR, textStatus, errorThrown) {
-                        alert(textStatus);
+                        alert(jqXHR.responseText);
                       }
                     });
                   }

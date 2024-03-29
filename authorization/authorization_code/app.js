@@ -152,7 +152,10 @@ app.get('/refresh_token', function(req, res) {
 });
 
 app.get('/get_playlists', function(request, result) {
-  getAllPlaylists(request.query.access_token).then((playlists) => {
+  // get_playlists will be called when the page is refreshed so we need to re-save the access token.
+  global_access_token = request.query.access_token;
+
+  getAllPlaylists(global_access_token).then((playlists) => {
     result.send({playlists: playlists});
   });
 });
@@ -160,34 +163,60 @@ app.get('/get_playlists', function(request, result) {
 app.get('/reorder', function(request, result) {
   let access_token = global_access_token;
   let name = request.query.playlist.name;
+  let isDryRun = request.query.isDryRun === 'true';
   let playlistDetails = {
     originalPlaylistId: request.query.playlist.id,
-    total: request.query.playlist.totalTracks,
-    snapshotId: request.query.playlist.snapshot_id
+    total: parseInt(request.query.playlist.totalTracks),
+    snapshotId: request.query.playlist.snapshotId
   };
 
-  createBackupPlaylist(access_token, name).then((backupPlaylistId) => {
-      playlistDetails.backupPlaylistId = backupPlaylistId;
-      return playlistDetails;
-  }).then((playlistDetails) => {
-    return getAllTracksFromPlaylist(access_token, playlistDetails).then((tracks) => {
+  if (isDryRun) {
+    createBackupPlaylist(access_token, name).then((backupPlaylistId) => {
+        playlistDetails.backupPlaylistId = backupPlaylistId;
+
+        return playlistDetails;
+    }).then((playlistDetails) => {
+      return getAllTracksFromPlaylist(access_token, playlistDetails).then((tracks) => {
+        playlistDetails.tracks = tracks;
+
+        return playlistDetails;
+      });
+    }).then((playlistDetails) => {
+      return addAllTracksToPlaylist(access_token, playlistDetails.tracks.slice(0, 10), playlistDetails.backupPlaylistId).then(() => {
+        return playlistDetails;
+      });
+    }).then((playlistDetails) => {
+      return reverseTracks(access_token, playlistDetails.backupPlaylistId, playlistDetails.tracks.slice(0, 10)).then(() => {
+        const responseString = `All tracks in backup playlist ${getBackupPlaylistName(name)} reversed`;
+
+        console.log(responseString);
+        result.send(responseString);
+
+        return playlistDetails;
+      });
+    }).catch((error) => {
+      console.error(error);
+      result.status(500).send(error);
+    });
+  } else {
+    getAllTracksFromPlaylist(access_token, playlistDetails).then((tracks) => {
       playlistDetails.tracks = tracks;
+
       return playlistDetails;
+    }).then((playlistDetails) => {
+      return reverseTracks(access_token, playlistDetails.originalPlaylistId, playlistDetails.tracks).then(() => {
+        const responseString = `All tracks in ${name} reversed?`;
+
+        console.log(responseString);
+        result.send(responseString);
+
+        return playlistDetails;
+      });
+    }).catch((error) => {
+      console.error(error);
+      result.status(500).send(error);
     });
-  }).then((playlistDetails) => {
-    return addAllTracksToPlaylist(access_token, playlistDetails.tracks.slice(0, 10), playlistDetails.backupPlaylistId).then(() => {
-      return playlistDetails;
-    });
-  }).then((playlistDetails) => {
-    return reverseTracks(access_token, playlistDetails.backupPlaylistId, playlistDetails.tracks.slice(0, 10)).then(() => {
-      console.log("All tracks reversed?");
-      result.send(`All tracks in ${name} reversed?`);
-      return playlistDetails;
-    })
-  }).catch((error) => {
-    console.error(error);
-    result.status(500).send(error);
-  });
+  }
 });
 
 /**
@@ -275,6 +304,10 @@ var extractPlaylistDetails = function(playlists, playlistName) {
   });
 };
 
+var getBackupPlaylistName = function(name) {
+  return name + BACKUP_PLAYLIST_SUFFIX;
+}
+
 /**
  * Create a backup playlist so we don't have to modify the original playlist.
  * @param {String} accessToken Current API access token.
@@ -285,7 +318,7 @@ var createBackupPlaylist = function(access_token, name) {
   const DESCRIPTION = "A copy of the playlist which shows what it would be like after it was reordered. Created " + new Date().toString();
 
   const data = {
-    name: name + BACKUP_PLAYLIST_SUFFIX,
+    name: getBackupPlaylistName(name),
     description: DESCRIPTION,
     public: false, // Not working for some reason. It's always public.
     collaborative: false
