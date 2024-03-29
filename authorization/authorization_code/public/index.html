@@ -41,8 +41,9 @@
       <h2>Pick a playlist to reorder</h2>
       <form>
         {{#each playlists}}
-          <input type="radio" name="playlists" value="{{this.name}}" data-name="{{this.name}}" data-id="{{this.id}}" data-total-tracks="{{this.tracks.total}}" data-snapshot-id="{{this.snapshot_id}}">
-          <label for="{{this.name}}">{{this.name}}</label><br>
+        <!-- Use @index so we can distinguish between playlists that have the same name. -->
+          <input id="{{this.name}}{{@index}}" type="radio" name="playlists" value="{{this.name}}" data-name="{{this.name}}" data-id="{{this.id}}" data-total-tracks="{{this.tracks.total}}" data-snapshot-id="{{this.snapshot_id}}">
+          <label for="{{this.name}}{{@index}}">{{this.name}}</label><br>
         {{/each}}
 
         <input type="checkbox" id="dry-run" checked>
