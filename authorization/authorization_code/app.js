@@ -14,11 +14,9 @@ var querystring = require('querystring');
 var cookieParser = require('cookie-parser');
 var fs = require('fs');
 
-// Hiding client info in JSON file because it should be secret.
-let client_info = JSON.parse(fs.readFileSync('client_info.json', 'utf-8'));
-
-var client_id = client_info['client_id']; // Your client id
-var client_secret = client_info['client_secret']; // Your secret
+// Client id and secret stored in .env file.
+var client_id = process.env.client_id;
+var client_secret = process.env.client_secret;
 var redirect_uri = 'http://localhost:8888/callback'; // Your redirect uri
 let global_access_token = '';
 const STARRED_PLAYLIST_NAME = "Starred";

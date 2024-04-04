@@ -7,13 +7,12 @@
 - Ask for a rate limit increase from Spotify. (1)
 - Figure out a way to publish this so other can use it. (3)
     - Github pages?
+        - No, we need to hide API keys and it's pretty much client side only.
 - Fork and attribute code to spotify example on github.
 - Make backup playlist private.
     - Not working for some reason.
 - For the dry run, re-use the existing StarredClone since you cannot delete a playlist with the API.
-- Why are we using a server? Couldn't we make all these requests on the client?
 - Show existing album art along with title before reordering.
-- Allow user to click a checkbox to say if they want to make the changes in a backup playlist. (1)
 
 # DONE
 - Should the user login using their account or can I just retrieve the playlist 
@@ -29,3 +28,6 @@
     - Try sending each song request individually to see if we get different failures.
 - Fetch all playlists, not just the first 20 returned by the API.
 - Add the ability to specify which playlist should be reordered.
+- Allow user to click a checkbox to say if they want to make the changes in a backup playlist. (1)
+- Why are we using a server? Couldn't we make all these requests on the client?
+    - No, we need a way to hide our Spotify API key.

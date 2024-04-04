@@ -12,6 +12,7 @@
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}\\authorization\\authorization_code\\app.js",
+            "envFile": "${workspaceFolder}\\authorization\\authorization_code\\.env",
             "cwd": "${workspaceFolder}\\authorization\\authorization_code"
         }
     ]

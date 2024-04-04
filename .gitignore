@@ -1,2 +1,3 @@
 track_backup.txt
 authorization/authorization_code/client_info.json
+authorization/authorization_code/.env
