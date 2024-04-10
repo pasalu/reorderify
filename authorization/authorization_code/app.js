@@ -17,7 +17,8 @@ var fs = require('fs');
 // Client id and secret stored in .env file.
 var client_id = process.env.client_id;
 var client_secret = process.env.client_secret;
-var redirect_uri = 'http://localhost:8888/callback'; // Your redirect uri
+var port = process.env.port || '8888';
+var redirect_uri = `http://localhost:${port}/callback`; // Your redirect uri
 let global_access_token = '';
 const STARRED_PLAYLIST_NAME = "Starred";
 const BACKUP_PLAYLIST_SUFFIX = "Reordered";
@@ -562,4 +563,4 @@ var reverseTracks = function(access_token, playlistId, tracks) {
   });
 }
 
-app.listen(8888);
+app.listen(port);
