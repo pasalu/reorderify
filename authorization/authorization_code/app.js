@@ -563,4 +563,5 @@ var reverseTracks = function(access_token, playlistId, tracks) {
   });
 }
 
+console.log(`Reorderify started and is listening on ${port}`);
 app.listen(port);
