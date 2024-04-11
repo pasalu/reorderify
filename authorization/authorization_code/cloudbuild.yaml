@@ -1,0 +1,9 @@
+steps:
+  - name: 'node'
+    entrypoint: 'npm'
+    dir: 'authorization/authorization_code'
+    args: ['install']
+  - name: 'node'
+    entrypoint: 'npm'
+    dir: 'authorization/authorization_code'
+    args: ['run']

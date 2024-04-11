@@ -1,7 +1,9 @@
 {
-  "name": "spotify-authorization-code-example",
-  "version": "0.0.2",
-  "description": "Spotify Authorization Code flow example",
+  "name": "reorderify",
+  "version": "0.0.1",
+  "description": "Reorder tracks in a Spotify playlist so that the album art updates correctly",
+  "main": "app.js",
+  "license": "MIT",
   "author": "Spotify",
   "scripts": {
     "start": "node app.js"
