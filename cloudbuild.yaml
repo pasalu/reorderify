@@ -7,3 +7,5 @@ steps:
     entrypoint: 'npm'
     dir: 'authorization/authorization_code'
     args: ['run']
+options:
+  logging: CLOUD_LOGGING_ONLY
