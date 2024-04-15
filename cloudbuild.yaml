@@ -4,8 +4,8 @@ steps:
     dir: 'authorization/authorization_code'
     args: ['install']
   - name: 'node'
-    entrypoint: 'npm'
+    entrypoint: 'node'
     dir: 'authorization/authorization_code'
-    args: ['run']
+    args: ['app.js']
 options:
   logging: CLOUD_LOGGING_ONLY
