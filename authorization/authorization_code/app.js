@@ -17,7 +17,7 @@ var fs = require('fs');
 // Client id and secret stored in .env file.
 var client_id = process.env.client_id;
 var client_secret = process.env.client_secret;
-var port = process.env.port || '8888';
+var port = process.env.PORT || '8888';
 var redirect_uri = `http://localhost:${port}/callback`; // Your redirect uri
 let global_access_token = '';
 const STARRED_PLAYLIST_NAME = "Starred";
@@ -563,5 +563,6 @@ var reverseTracks = function(access_token, playlistId, tracks) {
   });
 }
 
-console.log(`Reorderify started and is listening on ${port}`);
+console.log(`Before calling app.listen`);
 app.listen(port);
+console.log(`Reorderify started and is listening on ${port}`);
