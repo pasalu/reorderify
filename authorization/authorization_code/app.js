@@ -15,10 +15,10 @@ var cookieParser = require('cookie-parser');
 var fs = require('fs');
 
 // Client id and secret stored in .env file.
-var client_id = process.env.client_id;
-var client_secret = process.env.client_secret;
+var client_id = process.env.CLIENT_ID;
+var client_secret = process.env.CLIENT_SECRET;
 var port = process.env.PORT || '8888';
-var redirect_uri = `http://localhost:${port}/callback`; // Your redirect uri
+var redirect_uri = `http://localhost:${port}/callback`; // Gets set properly in /login
 let global_access_token = '';
 const STARRED_PLAYLIST_NAME = "Starred";
 const BACKUP_PLAYLIST_SUFFIX = "Reordered";
@@ -47,10 +47,11 @@ app.use(express.static(__dirname + '/public'))
    .use(cookieParser());
 
 app.get('/login', function(req, res) {
-
   var state = generateRandomString(16);
+  redirect_uri = getRedirectUri(req.headers.referer);
   res.cookie(stateKey, state);
 
+  console.log(`Redirect uri in /login: ${redirect_uri}`);
   // your application requests authorization
   var scope = 'user-read-private user-read-email playlist-read-private playlist-modify-public playlist-modify-private';
   res.redirect('https://accounts.spotify.com/authorize?' +
@@ -71,6 +72,8 @@ app.get('/callback', function(req, res) {
   var code = req.query.code || null;
   var state = req.query.state || null;
   var storedState = req.cookies ? req.cookies[stateKey] : null;
+
+  console.log(`Redirect uri in /callback ${redirect_uri}`);
 
   if (state === null || state !== storedState) {
     res.redirect('/#' +
@@ -561,6 +564,14 @@ var reverseTracks = function(access_token, playlistId, tracks) {
 
     return resolve();
   });
+}
+
+var getRedirectUri = function(referer) {
+  let url = new URL(referer);
+  url.port = port;
+  url.pathname += "callback";
+  
+  return url.toString();
 }
 
 console.log(`Before calling app.listen`);
